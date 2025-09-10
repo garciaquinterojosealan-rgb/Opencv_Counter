@@ -1,0 +1,28 @@
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+/* Video y Canvas superpuestos */
+.video-wrapper {
+  position: relative;
+  display: inline-block;
+}
+#video, #canvas {
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+}
+#canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Cards de contadores */
+.counter-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 15px;
+}
+.counter-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+}
