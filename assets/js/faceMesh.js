@@ -17,22 +17,22 @@ const browMinFrames = 2;           // frames para confirmar gesto
 
 // Cooldown tras parpadeo
 let browCooldown = 0;
-const browCooldownFrames = 2;
+const browCooldownFrames = 5;
 
 // Histeresis para cejas (porcentajes relativos a baseline)
-const RAISE_DELTA_UP = 0.055;
-const RAISE_DELTA_DOWN = 0.035;
+const RAISE_DELTA_UP = 0.08;
+const RAISE_DELTA_DOWN = 0.05;
 const BASELINE_ADAPT = 0.02;
 
 // Ventana corta y ruido para robustez cejas
 const BROW_BUFFER_SIZE   = 7;
-const BROW_NOISE_K       = 1.6;
-const BROW_MIN_ABS_DELTA = 0.005;
+const BROW_NOISE_K       = 2.2;
+const BROW_MIN_ABS_DELTA = 0.006;
 const BASELINE_WARMUP_FRAMES = 6;
 
 // Detector de pendiente (impulsos breves)
-const SLOPE_MIN_ABS   = 0.0018;
-const SLOPE_NOISE_K   = 0.09;
+const SLOPE_MIN_ABS   = 0.0028;
+const SLOPE_NOISE_K   = 1.2;
 const IMPULSE_OVERRIDE = 0.0035;
 
 let browBuf = [];
