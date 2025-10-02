@@ -1,28 +1,114 @@
-body {
-  font-family: "Segoe UI", Arial, sans-serif;
+/* ============ Base ============ */
+:root{
+  --soft-shadow: 0 10px 25px rgba(0,0,0,.08);
+  --soft-shadow-2: 0 18px 40px rgba(0,0,0,.10);
+  --inner-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(0,0,0,.04);
+  --grad-a: linear-gradient(135deg, #ffffff 0%, #f7f9ff 100%);
+  --grad-b: linear-gradient(135deg, #f8fbff 0%, #fef7ff 100%);
+  --badge-bg: #f5f7fb;
+  --badge-border: #e6e9f2;
+  --primary-glow: 0 0 0 6px rgba(13,110,253,.08);
 }
 
-/* Video y Canvas superpuestos */
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  letter-spacing: .2px;
+}
+
+/* Logo puntito */
+.logo-dot{
+  width: .75rem; height: .75rem;
+  display: inline-block; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #3dd, #09f);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.15);
+}
+
+/* ============ Video/Canvas ============ */
 .video-wrapper {
   position: relative;
   display: inline-block;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--soft-shadow-2);
+  background: #000;
 }
 #video, #canvas {
-  border-radius: 10px;
-  box-shadow: 0 0 15px rgba(0,0,0,0.2);
+  border-radius: 16px;
+  display: block;
 }
 #canvas {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 0; left: 0;
+}
+.vid-glow{
+  position: absolute;
+  inset: -2%;
+  border-radius: 18px;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(13,110,253,.0);
+  transition: box-shadow .3s ease;
+}
+.video-wrapper:hover .vid-glow{
+  box-shadow: 0 0 0 10px rgba(13,110,253,.08);
 }
 
-/* Cards de contadores */
+/* ============ Cards de contadores ============ */
+.shadow-soft { box-shadow: var(--soft-shadow); }
+.gradient-card { background: var(--grad-a); }
 .counter-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  border-radius: 15px;
+  background: var(--grad-b);
+  border-radius: 16px;
+  transition: transform .2s ease, box-shadow .2s ease, background .3s ease;
 }
 .counter-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  transform: translateY(-4px);
+  box-shadow: var(--soft-shadow-2);
+}
+
+.emoji-wrap{
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.06);
+  margin-bottom: .35rem;
+  box-shadow: var(--inner-shadow);
+}
+.emoji{ font-size: 28px; line-height: 1; }
+
+/* ============ Historial rápido ============ */
+#quick-history { border-radius: 18px; }
+#quick-history .card-body { padding: 1.25rem 1.25rem 1rem; }
+.shadow-inner { box-shadow: var(--inner-shadow); }
+.hist-col { border: 1px solid #f1f2f6; }
+
+.last5 {
+  margin: 0;
+}
+.last5 .list-group-item{
+  border: none !important;
+  padding: .4rem .25rem;
+}
+
+/* Badges de estado */
+.badge-status{
+  background: var(--badge-bg);
+  border: 1px solid var(--badge-border);
+  color: #334155;
+  padding: .35rem .6rem;
+  font-weight: 600;
+  letter-spacing: .2px;
+}
+
+/* List-group refinado */
+.list-group-numbered > .list-group-item::marker { color: #9aa4b2; }
+
+/* Footer */
+footer { box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+
+/* ============ Utilidades responsivas ============ */
+@media (max-width: 992px){
+  #video, #canvas { width: 100%; height: auto; }
+  .video-wrapper { width: 100%; }
 }

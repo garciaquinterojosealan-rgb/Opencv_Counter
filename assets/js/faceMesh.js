@@ -1,30 +1,47 @@
-// Contadores
-let eyeCount = 0, mouthCount = 0, browCount = 0;
+// facemesh.js
 
-// Estados previos
+// ===== Modelo de conteo: base (BD hoy) + live (sesión actual) =====
+let baseCounts = { eyes: 0, brows: 0, mouth: 0 };
+let liveCounts = { eyes: 0, brows: 0, mouth: 0 };
+
+function renderCounters() {
+  const $eye   = document.getElementById("eyeCount");
+  const $brow  = document.getElementById("browCount");
+  const $mouth = document.getElementById("mouthCount");
+  if ($eye)   $eye.innerText   = (baseCounts.eyes  || 0) + (liveCounts.eyes  || 0);
+  if ($brow)  $brow.innerText  = (baseCounts.brows || 0) + (liveCounts.brows || 0);
+  if ($mouth) $mouth.innerText = (baseCounts.mouth || 0) + (liveCounts.mouth || 0);
+}
+
+// Permite que app.js inyecte el offset del día desde la API
+window.counters = {
+  setBaseCounts(c) {
+    baseCounts.eyes  = c?.eyes  || 0;
+    baseCounts.brows = c?.brows || 0;
+    baseCounts.mouth = c?.mouth || 0;
+    renderCounters();
+  }
+};
+
+// ===== Estados previos =====
 let prevEyesClosed = false, prevMouthOpen = false, prevBrowsRaised = false;
 
-// Línea base para cejas
+// ===== Línea base y filtros para cejas =====
 let browBaseline = null;
-
-// Suavizado (EMA) para cejas
 let browEMA = null;
-const BROW_EMA_ALPHA = 0.38;       // sensibilidad
+const BROW_EMA_ALPHA = 0.38; // sensibilidad
 
-// Control de estabilidad cejas
 let browStableFrames = 0;
-const browMinFrames = 2;           // frames para confirmar gesto
-
-// Cooldown tras parpadeo
+const browMinFrames = 2;
 let browCooldown = 0;
 const browCooldownFrames = 5;
 
-// Histeresis para cejas (porcentajes relativos a baseline)
+// Histeresis para cejas
 const RAISE_DELTA_UP = 0.08;
 const RAISE_DELTA_DOWN = 0.05;
 const BASELINE_ADAPT = 0.02;
 
-// Ventana corta y ruido para robustez cejas
+// Ventana y ruido
 const BROW_BUFFER_SIZE   = 7;
 const BROW_NOISE_K       = 2.2;
 const BROW_MIN_ABS_DELTA = 0.006;
@@ -40,7 +57,7 @@ let browWarmup = 0;
 let prevBrowSmooth = null;
 let riseFrames = 0;
 
-// Utilidades
+// ===== Utilidades =====
 function pushAndTrim(arr, v, max) { arr.push(v); if (arr.length > max) arr.shift(); }
 function median(a){ if(!a.length) return 0; const b=[...a].sort((x,y)=>x-y); const m=Math.floor(b.length/2); return b.length%2?b[m]:(b[m-1]+b[m])/2; }
 function mad(a){ if(a.length<3) return 0; const m=median(a); const d=a.map(v=>Math.abs(v-m)); return 1.4826*median(d); }
@@ -57,36 +74,55 @@ function browRaiseMetric(lm, ipd) {
   return ((leftDy / (ipd || 1e-6)) + (rightDy / (ipd || 1e-6))) / 2;
 }
 
-// Lógica principal (ojos y boca quedan iguales)
+// ===== Lógica principal =====
 function detectMovements(landmarks) {
   if (!landmarks || landmarks.length < 400) return;
 
-  // --- Parpadeo (SIN CAMBIOS) ---
+  // --- OJOS (parpadeo por distancia vertical) ---
   const rightEyeDist = distance(landmarks[159], landmarks[145]);
   const leftEyeDist  = distance(landmarks[386], landmarks[374]);
   const eyesClosed   = rightEyeDist < 0.012 && leftEyeDist < 0.012;
 
-  if (!prevEyesClosed && eyesClosed) {
-    eyeCount++;
-    browCooldown = browCooldownFrames;
-  }
+  try {
+    if (!prevEyesClosed && eyesClosed) {
+      // transición OPEN -> CLOSED
+      window.api?.insertEye?.('CLOSED');
+      liveCounts.eyes += 1;       // sumar LIVE
+      renderCounters();
+    }
+    if ( prevEyesClosed && !eyesClosed) {
+      // transición CLOSED -> OPEN (solo registro)
+      window.api?.insertEye?.('OPEN');
+    }
+  } catch(e) { console.warn('insertEye transition', e); }
+
   prevEyesClosed = eyesClosed;
 
-  // --- Boca (SIN CAMBIOS) ---
+  // --- BOCA (apertura) ---
   const mouthDist = distance(landmarks[13], landmarks[14]);
   const mouthOpen = mouthDist > 0.03;
-  if (!prevMouthOpen && mouthOpen) mouthCount++;
+
+  if (!prevMouthOpen && mouthOpen) {
+    // cerrado -> abierto: cuenta
+    liveCounts.mouth += 1;
+    renderCounters();
+    try { window.api?.insertMouth?.('OPEN'); } catch(e) { console.warn(e); }
+  }
+  if (prevMouthOpen && !mouthOpen) {
+    // abierto -> cerrado: registro de cierre
+    try { window.api?.insertMouth?.('CLOSED'); } catch(e) { console.warn(e); }
+  }
   prevMouthOpen = mouthOpen;
 
-  // --- CEJAS (MEJORADO, seguro) ---
+  // --- CEJAS (levantamiento) ---
   const ipd = distance(landmarks[33], landmarks[263]);
   const browRaw = browRaiseMetric(landmarks, ipd);
 
   // Suavizado: EMA + mediana/MAD
   browEMA = (browEMA == null) ? browRaw : (BROW_EMA_ALPHA * browRaw + (1 - BROW_EMA_ALPHA) * browEMA);
   pushAndTrim(browBuf, browRaw, BROW_BUFFER_SIZE);
-  const browMed   = median(browBuf);
-  const browNoise = mad(browBuf);
+  const browMed    = median(browBuf);
+  const browNoise  = mad(browBuf);
   const browSmooth = (browEMA == null) ? browMed : 0.5 * browEMA + 0.5 * browMed;
 
   // Warmup baseline con rostro “neutro”
@@ -101,12 +137,12 @@ function detectMovements(landmarks) {
   let browsRaisedCandidate = false;
   let upper = NaN, lower = NaN;
   if (browBaseline != null) {
-    const upByPct   = browBaseline * (1 + RAISE_DELTA_UP);
-    const downByPct = browBaseline * (1 + RAISE_DELTA_DOWN);
-    const upByAbs   = browBaseline + BROW_MIN_ABS_DELTA;
-    const downByAbs = browBaseline + Math.min(BROW_MIN_ABS_DELTA * 0.6, BROW_MIN_ABS_DELTA);
-    const upByNoise   = browBaseline + BROW_NOISE_K * browNoise;
-    const downByNoise = browBaseline + Math.max(0.4 * BROW_NOISE_K * browNoise, 0);
+    const upByPct    = browBaseline * (1 + RAISE_DELTA_UP);
+    const downByPct  = browBaseline * (1 + RAISE_DELTA_DOWN);
+    const upByAbs    = browBaseline + BROW_MIN_ABS_DELTA;
+    const downByAbs  = browBaseline + Math.min(BROW_MIN_ABS_DELTA * 0.6, BROW_MIN_ABS_DELTA);
+    const upByNoise  = browBaseline + BROW_NOISE_K * browNoise;
+    const downByNoise= browBaseline + Math.max(0.4 * BROW_NOISE_K * browNoise, 0);
 
     upper = Math.max(upByPct, upByAbs, upByNoise);
     lower = Math.max(downByPct, downByAbs, downByNoise);
@@ -116,8 +152,8 @@ function detectMovements(landmarks) {
 
   // Pendiente (impulso breve)
   const slope = (prevBrowSmooth == null) ? 0 : (browSmooth - prevBrowSmooth);
-  const slopeGate = Math.max(SLOPE_MIN_ABS, SLOPE_NOISE_K * browNoise);
-  const nearUpper = (browBaseline != null && !Number.isNaN(upper)) ? (browSmooth > (upper - 0.002)) : false;
+  const slopeGate  = Math.max(SLOPE_MIN_ABS, SLOPE_NOISE_K * browNoise);
+  const nearUpper  = (browBaseline != null && !Number.isNaN(upper)) ? (browSmooth > (upper - 0.002)) : false;
   const strongImpulse = slope > slopeGate;
 
   if (!prevBrowsRaised && (browsRaisedCandidate || (strongImpulse && nearUpper))) {
@@ -141,13 +177,20 @@ function detectMovements(landmarks) {
 
   if (!eyesClosed && ((browsRaised && (browStableFrames + 1 >= browMinFrames)) || impulseOk)) {
     if (!prevBrowsRaised) {
-      browCount++;
+      // TRANSICIÓN: NEUTRAL → RAISED
+      liveCounts.brows += 1;
+      renderCounters();
+      try { window.api?.insertBrow?.('RAISED'); } catch(e){ console.warn('insertBrow RAISED', e); }
       prevBrowsRaised = true;
       riseFrames = 0;
     }
     browStableFrames = Math.min(browStableFrames + 1, 10);
   } else {
     if (!browsRaised) {
+      if (prevBrowsRaised) {
+        // TRANSICIÓN: RAISED → NEUTRAL
+        try { window.api?.insertBrow?.('NEUTRAL'); } catch(e){ console.warn('insertBrow NEUTRAL', e); }
+      }
       browStableFrames = 0;
       prevBrowsRaised = false;
     }
@@ -160,9 +203,7 @@ function detectMovements(landmarks) {
 
   prevBrowSmooth = browSmooth;
 
-  // Actualizar DOM
-  document.getElementById("eyeCount").innerText = eyeCount;
-  document.getElementById("mouthCount").innerText = mouthCount;
-  document.getElementById("browCount").innerText = browCount;
 }
 
+// Exporta detectMovements para que app.js lo llame
+window.detectMovements = detectMovements;
